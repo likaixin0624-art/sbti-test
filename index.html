@@ -1817,8 +1817,26 @@
 
       const result = computeResult();
       const type = result.finalType;
-      const levels = result.levels;
 
+      // 先绘制除图片外的所有内容，图片异步加载后再补绘
+      drawPosterContent(ctx, W, H, type, result, null);
+
+      // 加载人格图片
+      const imageSrc = TYPE_IMAGES[type.code];
+      if (imageSrc) {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = function() {
+          drawPosterContent(ctx, W, H, type, result, img);
+        };
+        img.onerror = function() {
+          // 图片加载失败，保持无图版本
+        };
+        img.src = imageSrc;
+      }
+    }
+
+    function drawPosterContent(ctx, W, H, type, result, img) {
       // 背景渐变
       const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
       bgGrad.addColorStop(0, '#f8fff8');
@@ -1841,114 +1859,95 @@
       ctx.fillStyle = '#4d6a53';
       ctx.font = '500 24px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('SBTI 人格测试结果', W / 2, 70);
+      ctx.fillText('SBTI 人格测试结果', W / 2, 60);
 
       // 分割线
       ctx.beginPath();
-      ctx.moveTo(80, 100);
-      ctx.lineTo(W - 80, 100);
+      ctx.moveTo(80, 85);
+      ctx.lineTo(W - 80, 85);
       ctx.strokeStyle = '#dbe8dd';
       ctx.lineWidth = 1;
       ctx.stroke();
 
+      // 人格图片区域
+      const imgBoxY = 110;
+      const imgBoxH = 480;
+      ctx.fillStyle = '#ffffff';
+      roundRect(ctx, 60, imgBoxY, W - 120, imgBoxH, 22);
+      ctx.fill();
+      ctx.strokeStyle = '#dbe8dd';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      if (img) {
+        const pad = 20;
+        const areaW = W - 120 - pad * 2;
+        const areaH = imgBoxH - pad * 2;
+        const scale = Math.min(areaW / img.width, areaH / img.height);
+        const dw = img.width * scale;
+        const dh = img.height * scale;
+        const dx = 60 + pad + (areaW - dw) / 2;
+        const dy = imgBoxY + pad + (areaH - dh) / 2;
+        ctx.save();
+        roundRect(ctx, 60 + pad, imgBoxY + pad, areaW, areaH, 16);
+        ctx.clip();
+        ctx.drawImage(img, dx, dy, dw, dh);
+        ctx.restore();
+      } else {
+        ctx.fillStyle = '#c8d8cc';
+        ctx.font = '28px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('图片加载中…', W / 2, imgBoxY + imgBoxH / 2 + 10);
+      }
+
       // 人格代号
+      const infoY = imgBoxY + imgBoxH + 40;
       ctx.fillStyle = '#1e2a22';
-      ctx.font = 'bold 72px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.font = 'bold 80px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(type.code, W / 2, 185);
+      ctx.fillText(type.code, W / 2, infoY);
 
       // 中文名称
       ctx.fillStyle = '#4d6a53';
-      ctx.font = '500 36px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
-      ctx.fillText(type.cn, W / 2, 235);
+      ctx.font = '500 40px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.fillText(type.cn, W / 2, infoY + 50);
 
       // 匹配度标签
       const badgeText = result.badge;
       ctx.font = 'bold 22px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
-      const badgeW = ctx.measureText(badgeText).width + 40;
+      const badgeW = ctx.measureText(badgeText).width + 44;
       const badgeX = (W - badgeW) / 2;
+      const badgeY = infoY + 72;
       ctx.fillStyle = '#edf6ef';
-      roundRect(ctx, badgeX, 258, badgeW, 42, 21);
+      roundRect(ctx, badgeX, badgeY, badgeW, 44, 22);
       ctx.fill();
       ctx.strokeStyle = '#dbe8dd';
       ctx.lineWidth = 1;
       ctx.stroke();
       ctx.fillStyle = '#4d6a53';
       ctx.font = 'bold 20px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
-      ctx.fillText(badgeText, W / 2, 285);
+      ctx.fillText(badgeText, W / 2, badgeY + 29);
 
       // Intro 语
       ctx.fillStyle = '#6a786f';
-      ctx.font = '24px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
-      ctx.fillText('「' + type.intro + '」', W / 2, 340);
+      ctx.font = '26px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('「' + type.intro + '」', W / 2, badgeY + 86);
 
-      // 15 维度网格
-      const gridStartY = 385;
+      // 描述文字（截取前120字）
+      const descY = badgeY + 126;
       ctx.fillStyle = '#ffffff';
-      roundRect(ctx, 40, gridStartY - 10, W - 80, 460, 18);
+      roundRect(ctx, 50, descY - 14, W - 100, 310, 18);
       ctx.fill();
       ctx.strokeStyle = '#dbe8dd';
       ctx.lineWidth = 1;
       ctx.stroke();
 
-      ctx.fillStyle = '#1e2a22';
-      ctx.font = 'bold 24px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText('十五维度评分', 70, gridStartY + 28);
-
-      const cols = 3;
-      const cellW = 200, cellH = 52;
-      const gridX = 70, gridY = gridStartY + 50;
-
-      dimensionOrder.forEach((dim, i) => {
-        const col = i % cols;
-        const row = Math.floor(i / cols);
-        const x = gridX + col * (cellW + 16);
-        const y = gridY + row * (cellH + 14);
-
-        // 维度名
-        ctx.fillStyle = '#6a786f';
-        ctx.font = '20px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
-        ctx.textAlign = 'left';
-        const shortName = dimensionMeta[dim].name.replace(/^\S+\s/, '');
-        ctx.fillText(shortName, x, y + 18);
-
-        // 等级
-        const level = levels[dim];
-        const levelColor = level === 'H' ? '#4d6a53' : level === 'M' ? '#8ba88e' : '#b0b8b2';
-        ctx.fillStyle = levelColor;
-        ctx.font = 'bold 24px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
-        ctx.fillText(level, x + cellW - 30, y + 18);
-
-        // 底部条
-        const barY = y + 32;
-        ctx.fillStyle = '#edf3ee';
-        roundRect(ctx, x, barY, cellW, 6, 3);
-        ctx.fill();
-        const barW = level === 'H' ? cellW : level === 'M' ? cellW * 0.55 : cellW * 0.25;
-        const barGrad = ctx.createLinearGradient(x, 0, x + barW, 0);
-        barGrad.addColorStop(0, '#97b59c');
-        barGrad.addColorStop(1, '#5b7a62');
-        ctx.fillStyle = barGrad;
-        roundRect(ctx, x, barY, barW, 6, 3);
-        ctx.fill();
-      });
-
-      // 分割线
-      const secY = gridStartY + 470;
-      ctx.beginPath();
-      ctx.moveTo(80, secY);
-      ctx.lineTo(W - 80, secY);
-      ctx.strokeStyle = '#dbe8dd';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-
-      // 描述文字（截取前100字）
-      const descText = type.desc.slice(0, 100) + '……';
+      const descText = type.desc.slice(0, 120) + '……';
       ctx.fillStyle = '#304034';
       ctx.font = '22px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
       ctx.textAlign = 'left';
-      wrapText(ctx, descText, 70, secY + 40, W - 140, 34);
+      wrapText(ctx, descText, 80, descY + 22, W - 160, 34);
 
       // 底部引导
       const footY = H - 130;
@@ -1960,17 +1959,17 @@
       ctx.stroke();
 
       ctx.fillStyle = '#4d6a53';
-      ctx.font = 'bold 26px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.font = 'bold 28px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('SBTI 人格测试', W / 2, footY + 42);
 
       ctx.fillStyle = '#6a786f';
-      ctx.font = '20px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.font = '22px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
       ctx.fillText('sbti-test.site', W / 2, footY + 74);
 
       ctx.fillStyle = '#8ba88e';
-      ctx.font = '18px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
-      ctx.fillText('快来测测你是什么人格！', W / 2, footY + 104);
+      ctx.font = '20px -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.fillText('快来测测你是什么人格！', W / 2, footY + 106);
     }
 
     function roundRect(ctx, x, y, w, h, r) {
